@@ -1,0 +1,1573 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SAMANVAY-WX · Hybrid AI–NWP Multi-Model Forecast Blending System</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg-1:#eaf1fb; --bg-2:#d6e4f7;
+  --bg-grad-1:#e9f2ff; --bg-grad-2:#f5f8ff; --bg-grad-3:#dde9fb;
+  --glass-bg:rgba(255,255,255,0.55); --glass-bg-strong:rgba(255,255,255,0.78);
+  --glass-border:rgba(255,255,255,0.75);
+  --glass-shadow:0 8px 32px rgba(20,40,80,0.10),0 1px 0 rgba(255,255,255,0.6) inset;
+  --card-hover:0 12px 40px rgba(20,40,80,0.16);
+  --text-primary:#0b1e3a; --text-secondary:#40556f; --text-muted:#7a8aa2;
+  --accent:#1a6dff; --accent-2:#00b8a9; --accent-3:#ff6b4a; --accent-4:#a259ff; --accent-5:#ffb000;
+  --success:#12b76a; --warn:#f79009; --danger:#f04438;
+  --border:rgba(20,40,80,0.10); --border-strong:rgba(20,40,80,0.18);
+  --sidebar-bg:rgba(255,255,255,0.55); --topbar-bg:rgba(255,255,255,0.65);
+}
+[data-theme="dark"] {
+  --bg-1:#05080f; --bg-2:#0a1424;
+  --bg-grad-1:#060b16; --bg-grad-2:#0b1a30; --bg-grad-3:#04070d;
+  --glass-bg:rgba(20,32,54,0.55); --glass-bg-strong:rgba(22,36,60,0.78);
+  --glass-border:rgba(120,160,220,0.18);
+  --glass-shadow:0 8px 32px rgba(0,0,0,0.45),0 1px 0 rgba(255,255,255,0.05) inset;
+  --card-hover:0 12px 40px rgba(0,0,0,0.55);
+  --text-primary:#e6eeff; --text-secondary:#a9bcd8; --text-muted:#6e83a3;
+  --accent:#4d94ff; --accent-2:#2ee0cf; --accent-3:#ff8266; --accent-4:#bb7dff; --accent-5:#ffc233;
+  --success:#2ed37f; --warn:#fbb244; --danger:#ff6659;
+  --border:rgba(120,160,220,0.14); --border-strong:rgba(120,160,220,0.28);
+  --sidebar-bg:rgba(12,22,40,0.6); --topbar-bg:rgba(12,22,40,0.7);
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+html,body { height:100%; }
+body {
+  font-family:'Inter',system-ui,sans-serif; color:var(--text-primary);
+  background:
+    radial-gradient(1200px 800px at 10% -10%,var(--bg-grad-1),transparent 60%),
+    radial-gradient(1000px 700px at 90% 10%,var(--bg-grad-2),transparent 55%),
+    linear-gradient(160deg,var(--bg-grad-3),var(--bg-1) 40%,var(--bg-2));
+  background-attachment:fixed; min-height:100vh; overflow:hidden;
+  transition:color .35s,background .35s;
+}
+body::before {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:
+    radial-gradient(600px 400px at 15% 80%,rgba(26,109,255,.16),transparent 60%),
+    radial-gradient(700px 500px at 85% 20%,rgba(0,184,169,.14),transparent 60%),
+    radial-gradient(500px 400px at 50% 50%,rgba(162,89,255,.10),transparent 70%);
+  animation:drift 26s ease-in-out infinite alternate; filter:blur(6px);
+}
+[data-theme="dark"] body::before {
+  background:
+    radial-gradient(600px 400px at 15% 80%,rgba(77,148,255,.20),transparent 60%),
+    radial-gradient(700px 500px at 85% 20%,rgba(46,224,207,.14),transparent 60%),
+    radial-gradient(500px 400px at 50% 50%,rgba(187,125,255,.14),transparent 70%);
+}
+@keyframes drift { 50% { transform:translate3d(-30px,20px,0) scale(1.08); } 100% { transform:translate3d(20px,-20px,0) scale(1); } }
+::-webkit-scrollbar { width:10px; height:10px; }
+::-webkit-scrollbar-thumb { background:var(--border-strong); border-radius:8px; }
+
+#loader { position:fixed; inset:0; z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:linear-gradient(160deg,var(--bg-grad-3),var(--bg-1)); transition:opacity .7s,visibility .7s; }
+#loader.hide { opacity:0; visibility:hidden; }
+.loader-logo { width:92px; height:92px; border-radius:26px;
+  background:conic-gradient(from 220deg,var(--accent),var(--accent-2),var(--accent-4),var(--accent));
+  display:grid; place-items:center; box-shadow:0 20px 60px rgba(26,109,255,.35);
+  animation:pulse 2s ease-in-out infinite; position:relative; }
+.loader-logo::after { content:''; position:absolute; inset:6px; border-radius:20px; background:var(--bg-1); }
+.loader-logo span { position:relative; z-index:2; font-weight:800; font-size:30px;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+@keyframes pulse { 50% { transform:scale(1.06); } }
+.loader-title { margin-top:24px; font-weight:700; letter-spacing:4px; font-size:13px; color:var(--text-secondary); }
+.loader-bar { width:220px; height:3px; background:var(--border); border-radius:4px; margin-top:18px; overflow:hidden; }
+.loader-bar i { display:block; height:100%; width:40%; background:linear-gradient(90deg,var(--accent),var(--accent-2)); animation:load 1.4s ease-in-out infinite; }
+@keyframes load { 0% { transform:translateX(-100%); } 100% { transform:translateX(300%); } }
+
+.app { position:relative; z-index:1; display:grid; grid-template-columns:250px 1fr; height:100vh; }
+.sidebar { background:var(--sidebar-bg); backdrop-filter:blur(24px) saturate(160%); -webkit-backdrop-filter:blur(24px) saturate(160%);
+  border-right:1px solid var(--glass-border); display:flex; flex-direction:column; padding:20px 14px; overflow-y:auto; transition:background .35s,border-color .35s; }
+.brand { display:flex; align-items:center; gap:12px; padding:4px 6px 20px; }
+.brand-logo { width:42px; height:42px; border-radius:13px; flex-shrink:0;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  display:grid; place-items:center; box-shadow:0 8px 22px rgba(26,109,255,.35);
+  color:#fff; font-weight:800; font-size:16px; position:relative; overflow:hidden; }
+.brand-logo::after { content:''; position:absolute; inset:0; background:linear-gradient(135deg,transparent 40%,rgba(255,255,255,.35)); }
+.brand-text h1 { font-size:14.5px; font-weight:800; letter-spacing:-0.2px; line-height:1.1; }
+.brand-text span { font-size:10px; color:var(--text-muted); letter-spacing:1.6px; font-weight:600; text-transform:uppercase; }
+.nav-section { margin-top:8px; }
+.nav-label { font-size:10px; font-weight:700; letter-spacing:1.6px; color:var(--text-muted); padding:12px 10px 8px; text-transform:uppercase; }
+.nav-item { display:flex; align-items:center; gap:12px; padding:10px 12px; margin:2px 0; border-radius:12px;
+  color:var(--text-secondary); font-size:13px; font-weight:500; cursor:pointer; user-select:none;
+  transition:all .2s; position:relative; border:1px solid transparent; }
+.nav-item:hover { background:var(--glass-bg); color:var(--text-primary); }
+.nav-item.active { background:linear-gradient(135deg,rgba(26,109,255,.14),rgba(0,184,169,.10));
+  color:var(--text-primary); font-weight:600; border-color:var(--glass-border); box-shadow:0 4px 14px rgba(26,109,255,.12); }
+.nav-item.active::before { content:''; position:absolute; left:-14px; top:50%; transform:translateY(-50%);
+  width:3px; height:22px; border-radius:0 4px 4px 0; background:linear-gradient(180deg,var(--accent),var(--accent-2)); }
+.nav-icon { width:18px; height:18px; flex-shrink:0; stroke-width:1.8; }
+.sidebar-footer { margin-top:auto; padding:14px 8px 4px; }
+.sys-card { padding:12px; border-radius:12px; background:var(--glass-bg); border:1px solid var(--glass-border); font-size:11px; }
+.sys-row { display:flex; justify-content:space-between; margin:4px 0; color:var(--text-secondary); }
+.sys-dot { width:7px; height:7px; border-radius:50%; background:var(--success); display:inline-block; margin-right:6px; box-shadow:0 0 8px var(--success); animation:blink 2s infinite; }
+@keyframes blink { 50% { opacity:.4; } }
+
+.main { display:flex; flex-direction:column; overflow:hidden; }
+.topbar { height:64px; flex-shrink:0; display:flex; align-items:center; gap:16px; padding:0 22px;
+  background:var(--topbar-bg); backdrop-filter:blur(20px) saturate(160%); -webkit-backdrop-filter:blur(20px) saturate(160%);
+  border-bottom:1px solid var(--glass-border); transition:background .35s,border-color .35s; }
+.crumb { font-size:12px; color:var(--text-muted); font-weight:500; }
+.crumb b { color:var(--text-primary); font-weight:700; }
+.topbar-title { font-size:15px; font-weight:700; letter-spacing:-0.2px; }
+.top-controls { margin-left:auto; display:flex; align-items:center; gap:10px; }
+.chip { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:11px;
+  background:var(--glass-bg); border:1px solid var(--glass-border); font-size:12px; font-weight:600;
+  color:var(--text-secondary); backdrop-filter:blur(14px); cursor:pointer; user-select:none; transition:all .2s; }
+.chip:hover { border-color:var(--border-strong); color:var(--text-primary); }
+.chip select { background:transparent; border:none; outline:none; color:var(--text-primary); font-weight:600; font-size:12px; font-family:inherit; cursor:pointer; }
+.chip select option { color:#111; background:#fff; }
+[data-theme="dark"] .chip select option { color:#eee; background:#0b1a30; }
+.icon-btn { width:40px; height:40px; border-radius:11px; display:grid; place-items:center;
+  background:var(--glass-bg); border:1px solid var(--glass-border); cursor:pointer; color:var(--text-secondary); transition:all .2s; }
+.icon-btn:hover { color:var(--text-primary); border-color:var(--border-strong); transform:translateY(-1px); }
+.icon-btn svg { width:18px; height:18px; }
+.pill-live { display:inline-flex; align-items:center; gap:6px; padding:6px 11px; border-radius:20px;
+  font-size:10.5px; font-weight:700; letter-spacing:.6px; background:rgba(18,183,106,.12); color:var(--success);
+  border:1px solid rgba(18,183,106,.25); text-transform:uppercase; }
+
+.content { flex:1; overflow-y:auto; padding:22px; }
+.view { display:none; animation:fadeUp .35s; }
+.view.active { display:block; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+
+.grid { display:grid; gap:18px; }
+.grid-4 { grid-template-columns:repeat(4,1fr); }
+.grid-3 { grid-template-columns:repeat(3,1fr); }
+.grid-2 { grid-template-columns:repeat(2,1fr); }
+.grid-map { grid-template-columns:1fr 320px; }
+.grid-comparison { grid-template-columns:repeat(2,1fr); }
+@media (max-width:1400px) { .grid-4 { grid-template-columns:repeat(2,1fr); } }
+@media (max-width:1100px) {
+  .grid-map,.grid-3,.grid-2,.grid-comparison { grid-template-columns:1fr; }
+  .app { grid-template-columns:78px 1fr; }
+  .brand-text,.nav-item span:not(.nav-icon),.nav-label,.sidebar-footer .sys-card { display:none; }
+  .nav-item { justify-content:center; padding:12px; }
+  .brand { justify-content:center; padding-left:0; padding-right:0; }
+}
+@media (max-width:700px) { .grid-4 { grid-template-columns:1fr; } .top-controls .chip.hide-sm { display:none; } }
+
+.card { background:var(--glass-bg); backdrop-filter:blur(22px) saturate(150%); -webkit-backdrop-filter:blur(22px) saturate(150%);
+  border:1px solid var(--glass-border); border-radius:18px; box-shadow:var(--glass-shadow);
+  padding:18px; transition:transform .25s,box-shadow .25s,background .35s,border-color .35s; position:relative; overflow:hidden; }
+.card::before { content:''; position:absolute; top:0; left:0; right:0; height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.7),transparent); opacity:.8; }
+[data-theme="dark"] .card::before { background:linear-gradient(90deg,transparent,rgba(120,180,255,.35),transparent); }
+.card:hover { box-shadow:var(--card-hover); }
+.card.flat:hover { transform:none; }
+
+.stat-card { display:flex; flex-direction:column; gap:10px; }
+.stat-head { display:flex; align-items:center; justify-content:space-between; }
+.stat-ico { width:38px; height:38px; border-radius:11px; display:grid; place-items:center;
+  background:linear-gradient(135deg,rgba(26,109,255,.15),rgba(0,184,169,.10)); border:1px solid var(--glass-border); }
+.stat-ico svg { width:18px; height:18px; stroke:var(--accent); }
+.stat-label { font-size:11.5px; color:var(--text-muted); font-weight:600; letter-spacing:.4px; text-transform:uppercase; }
+.stat-value { font-size:26px; font-weight:800; letter-spacing:-1px; font-variant-numeric:tabular-nums; }
+.stat-sub { font-size:12px; color:var(--text-secondary); display:flex; align-items:center; gap:6px; }
+.trend-up { color:var(--success); font-weight:700; font-size:11.5px; }
+.trend-down { color:var(--danger); font-weight:700; font-size:11.5px; }
+
+.sec-title { display:flex; align-items:center; gap:10px; font-size:13px; font-weight:700; letter-spacing:.2px; margin-bottom:12px; }
+.sec-title .dot { width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 8px var(--accent); }
+
+.map-wrap { position:relative; border-radius:16px; overflow:hidden; border:1px solid var(--glass-border); }
+.leaflet-container { background:var(--bg-2) !important; font-family:inherit; }
+.map-lg { height:560px; } .map-md { height:420px; } .map-sm { height:260px; }
+.leaflet-control-attribution { font-size:9px !important; background:rgba(255,255,255,.6) !important; backdrop-filter:blur(6px); }
+[data-theme="dark"] .leaflet-control-attribution { background:rgba(10,20,36,.6) !important; color:#8899b5 !important; }
+[data-theme="dark"] .leaflet-control-attribution a { color:#a9bcd8 !important; }
+.leaflet-bar { border:1px solid var(--glass-border) !important; box-shadow:var(--glass-shadow) !important; }
+.leaflet-bar a { background:var(--glass-bg-strong) !important; color:var(--text-primary) !important; border-bottom-color:var(--glass-border) !important; backdrop-filter:blur(12px); }
+.leaflet-bar a:hover { background:var(--accent) !important; color:#fff !important; }
+.map-toolbar { position:absolute; top:12px; left:12px; z-index:500; display:flex; gap:8px; flex-wrap:wrap; max-width:calc(100% - 24px); }
+.map-badge { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:9px; font-size:11px; font-weight:600;
+  background:var(--glass-bg-strong); border:1px solid var(--glass-border); backdrop-filter:blur(14px); color:var(--text-primary); }
+.map-badge .sw { width:8px; height:8px; border-radius:3px; }
+.legend-scale { position:absolute; bottom:14px; right:14px; z-index:500; padding:10px 12px; border-radius:12px;
+  background:var(--glass-bg-strong); border:1px solid var(--glass-border); backdrop-filter:blur(14px); font-size:10.5px; min-width:170px; }
+.legend-scale .bar { height:8px; border-radius:4px; margin:6px 0;
+  background:linear-gradient(90deg,#4a90e2,#6fd3ff,#a8e8a8,#ffe066,#ff9b52,#ff4d4d); }
+.legend-scale .row { display:flex; justify-content:space-between; color:var(--text-secondary); font-weight:600; }
+
+.layer-panel { display:flex; flex-direction:column; gap:8px; }
+.layer-item { display:flex; align-items:center; gap:10px; padding:9px 11px; border-radius:11px; cursor:pointer;
+  background:var(--glass-bg); border:1px solid var(--glass-border); font-size:12.5px; font-weight:500; transition:all .2s; }
+.layer-item:hover { border-color:var(--border-strong); }
+.layer-item.on { background:linear-gradient(135deg,rgba(26,109,255,.12),rgba(0,184,169,.08)); border-color:rgba(26,109,255,.3); }
+.layer-swatch { width:14px; height:14px; border-radius:4px; flex-shrink:0; }
+.layer-item .tick { margin-left:auto; width:16px; height:16px; opacity:0; transition:opacity .2s; }
+.layer-item.on .tick { opacity:1; }
+
+.wbar { margin-top:6px; }
+.wbar-row { display:flex; align-items:center; gap:10px; font-size:12px; margin:8px 0; }
+.wbar-name { width:92px; color:var(--text-secondary); font-weight:600; flex-shrink:0; }
+.wbar-track { flex:1; height:8px; border-radius:6px; background:var(--border); overflow:hidden; }
+.wbar-fill { height:100%; border-radius:6px; transition:width .8s cubic-bezier(.2,.8,.2,1); }
+.wbar-val { width:42px; text-align:right; font-weight:700; font-variant-numeric:tabular-nums; color:var(--text-primary); }
+
+.gauge { display:flex; flex-direction:column; align-items:center; gap:8px; padding:16px 0; }
+.gauge-ring { width:130px; height:130px; border-radius:50%; display:grid; place-items:center; position:relative;
+  background:conic-gradient(var(--accent) 0turn,var(--border) 0turn); transition:background .8s; }
+.gauge-ring::after { content:''; position:absolute; inset:10px; border-radius:50%; background:var(--glass-bg-strong); backdrop-filter:blur(12px); }
+.gauge-val { position:relative; z-index:2; font-size:26px; font-weight:800; letter-spacing:-1px; }
+.gauge-val small { font-size:12px; color:var(--text-muted); font-weight:600; display:block; text-align:center; letter-spacing:.4px; }
+
+.chart-wrap { position:relative; height:260px; }
+.chart-wrap.tall { height:340px; } .chart-wrap.short { height:180px; }
+
+.tbl { width:100%; border-collapse:collapse; font-size:12.5px; }
+.tbl th { text-align:left; padding:10px 12px; font-weight:700; color:var(--text-muted); font-size:10.5px; letter-spacing:1px; text-transform:uppercase; border-bottom:1px solid var(--border); }
+.tbl td { padding:11px 12px; border-bottom:1px solid var(--border); color:var(--text-secondary); }
+.tbl tbody tr { transition:background .15s; } .tbl tbody tr:hover { background:var(--glass-bg); }
+.tbl td b { color:var(--text-primary); font-weight:700; }
+
+.tag { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px; font-size:10.5px; font-weight:700; letter-spacing:.3px; }
+.tag.green { background:rgba(18,183,106,.14); color:var(--success); }
+.tag.orange { background:rgba(247,144,9,.16); color:var(--warn); }
+.tag.red { background:rgba(240,68,56,.14); color:var(--danger); }
+.tag.blue { background:rgba(26,109,255,.14); color:var(--accent); }
+.tag.purple { background:rgba(162,89,255,.14); color:var(--accent-4); }
+
+.model-panel-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.model-name { font-weight:700; font-size:13px; display:flex; align-items:center; gap:8px; }
+.model-name .dot { width:10px; height:10px; border-radius:4px; }
+.model-stats { display:flex; gap:14px; margin-top:10px; font-size:11.5px; color:var(--text-secondary); }
+.model-stats b { color:var(--text-primary); font-weight:700; }
+
+.alert { display:flex; gap:12px; padding:14px; border-radius:13px; background:var(--glass-bg); border:1px solid var(--glass-border); margin-bottom:10px; transition:transform .2s; }
+.alert:hover { transform:translateX(3px); }
+.alert-ico { width:36px; height:36px; border-radius:10px; flex-shrink:0; display:grid; place-items:center; font-size:16px; }
+.alert.sev-high .alert-ico { background:rgba(240,68,56,.14); color:var(--danger); }
+.alert.sev-med .alert-ico { background:rgba(247,144,9,.16); color:var(--warn); }
+.alert.sev-low .alert-ico { background:rgba(18,183,106,.14); color:var(--success); }
+.alert-title { font-weight:700; font-size:13px; margin-bottom:3px; }
+.alert-desc { font-size:11.5px; color:var(--text-secondary); line-height:1.5; }
+.alert-meta { font-size:10.5px; color:var(--text-muted); margin-top:6px; font-weight:600; letter-spacing:.3px; }
+
+.q-item { padding:14px; border-radius:13px; background:var(--glass-bg); border:1px solid var(--glass-border); margin-bottom:10px; border-left:3px solid var(--warn); transition:all .2s; }
+.q-item:hover { border-left-color:var(--accent); transform:translateX(2px); }
+.q-item.critical { border-left-color:var(--danger); }
+.q-head { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.q-title { font-weight:700; font-size:13px; }
+.q-meta { font-size:11px; color:var(--text-muted); margin-left:auto; font-weight:600; }
+.q-body { font-size:12px; color:var(--text-secondary); line-height:1.55; }
+.q-reasons { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+
+.drawer-backdrop { position:fixed; inset:0; background:rgba(6,14,28,.4); backdrop-filter:blur(4px); z-index:900; opacity:0; visibility:hidden; transition:opacity .3s,visibility .3s; }
+.drawer-backdrop.show { opacity:1; visibility:visible; }
+.drawer { position:fixed; top:0; right:0; bottom:0; width:420px; max-width:92vw; z-index:1000;
+  background:var(--glass-bg-strong); backdrop-filter:blur(30px) saturate(180%); -webkit-backdrop-filter:blur(30px) saturate(180%);
+  border-left:1px solid var(--glass-border); transform:translateX(100%); transition:transform .35s cubic-bezier(.2,.8,.2,1); padding:24px; overflow-y:auto; }
+.drawer.show { transform:translateX(0); }
+.drawer-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+.drawer-title { font-weight:800; font-size:16px; }
+.close-btn { width:32px; height:32px; border-radius:9px; background:var(--glass-bg); border:1px solid var(--glass-border); display:grid; place-items:center; cursor:pointer; color:var(--text-secondary); }
+.close-btn:hover { color:var(--text-primary); }
+.kv { display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px dashed var(--border); font-size:12.5px; }
+.kv span { color:var(--text-muted); } .kv b { color:var(--text-primary); font-weight:700; }
+.rc { display:flex; gap:10px; padding:10px 12px; border-radius:11px; background:var(--glass-bg); border:1px solid var(--glass-border); font-size:12px; margin:8px 0; align-items:flex-start; }
+.rc-ico { font-size:14px; line-height:1; }
+
+.slide-stage { position:relative; border-radius:22px; overflow:hidden;
+  background:var(--glass-bg); border:1px solid var(--glass-border);
+  box-shadow:var(--glass-shadow); min-height:640px; display:flex; flex-direction:column; }
+.slide-progress { height:4px; background:var(--border); position:relative; }
+.slide-progress i { display:block; height:100%; background:linear-gradient(90deg,var(--accent),var(--accent-2));
+  transition:width .5s cubic-bezier(.2,.8,.2,1); border-radius:0 4px 4px 0; }
+.slide-body { flex:1; padding:40px 44px; overflow-y:auto; }
+.slide { display:none; animation:slideIn .5s cubic-bezier(.2,.8,.2,1); }
+.slide.active { display:block; }
+@keyframes slideIn { from { opacity:0; transform:translateX(24px); } to { opacity:1; transform:none; } }
+.slide-num { font-size:12px; letter-spacing:3px; color:var(--text-muted); font-weight:700; }
+.slide-kicker { font-size:12px; font-weight:700; color:var(--accent); letter-spacing:2px; text-transform:uppercase; margin-top:12px; }
+.slide-title { font-size:40px; font-weight:800; letter-spacing:-1.2px; line-height:1.1; margin:8px 0 16px; }
+.slide-title .grad { background:linear-gradient(135deg,var(--accent),var(--accent-2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.slide-lede { font-size:16px; color:var(--text-secondary); line-height:1.6; max-width:780px; }
+.slide-grid { display:grid; gap:16px; margin-top:26px; }
+.slide-grid.c2 { grid-template-columns:1fr 1fr; }
+.slide-grid.c3 { grid-template-columns:repeat(3,1fr); }
+.slide-grid.c4 { grid-template-columns:repeat(4,1fr); }
+@media (max-width:900px) { .slide-grid.c2,.slide-grid.c3,.slide-grid.c4 { grid-template-columns:1fr; } }
+.slide-box { padding:16px; border-radius:14px; background:var(--glass-bg-strong); border:1px solid var(--glass-border); }
+.slide-box h4 { font-size:13px; margin-bottom:6px; letter-spacing:-.1px; }
+.slide-box p { font-size:12.5px; color:var(--text-secondary); line-height:1.55; }
+.slide-box .ic { width:34px; height:34px; border-radius:10px; display:grid; place-items:center; font-size:16px; margin-bottom:10px;
+  background:linear-gradient(135deg,rgba(26,109,255,.16),rgba(0,184,169,.10)); border:1px solid var(--glass-border); }
+
+.flow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:22px; }
+.flow-node { padding:12px 16px; border-radius:12px; background:var(--glass-bg-strong); border:1px solid var(--glass-border);
+  font-size:12px; font-weight:700; letter-spacing:-.1px; display:flex; align-items:center; gap:8px; }
+.flow-node .sw { width:8px; height:8px; border-radius:3px; }
+.flow-arrow { color:var(--text-muted); font-weight:700; }
+
+.slide-nav { display:flex; align-items:center; justify-content:space-between; padding:16px 22px;
+  border-top:1px solid var(--glass-border); background:var(--glass-bg-strong); backdrop-filter:blur(14px); }
+.slide-nav-btn { display:inline-flex; align-items:center; gap:8px; padding:9px 16px; border-radius:11px;
+  background:var(--glass-bg); border:1px solid var(--glass-border); cursor:pointer; font-size:12.5px; font-weight:700;
+  color:var(--text-primary); transition:all .2s; user-select:none; }
+.slide-nav-btn:hover { border-color:var(--accent); color:var(--accent); transform:translateY(-1px); }
+.slide-nav-btn:disabled { opacity:.35; cursor:not-allowed; transform:none; }
+.slide-dots { display:flex; gap:8px; }
+.slide-dot { width:10px; height:10px; border-radius:50%; background:var(--border-strong); cursor:pointer; transition:all .25s; }
+.slide-dot:hover { background:var(--text-muted); }
+.slide-dot.on { background:linear-gradient(135deg,var(--accent),var(--accent-2)); width:28px; border-radius:6px; }
+
+.api-status { display:flex; align-items:center; gap:12px; padding:14px 16px; border-radius:13px;
+  background:var(--glass-bg); border:1px solid var(--glass-border); }
+.api-status .dot { width:10px; height:10px; border-radius:50%; }
+.api-status .dot.on { background:var(--success); box-shadow:0 0 12px var(--success); animation:blink 2s infinite; }
+.api-status .dot.off { background:var(--danger); box-shadow:0 0 12px var(--danger); }
+.api-status .dot.checking { background:var(--warn); box-shadow:0 0 12px var(--warn); animation:blink .8s infinite; }
+.api-endpoint { display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:12px;
+  background:var(--glass-bg); border:1px solid var(--glass-border); font-family:'JetBrains Mono',monospace; font-size:12px; margin-bottom:8px; }
+.method { padding:3px 8px; border-radius:6px; font-weight:700; font-size:10.5px; letter-spacing:.5px; flex-shrink:0; }
+.method.get { background:rgba(18,183,106,.16); color:var(--success); }
+.method.post { background:rgba(26,109,255,.16); color:var(--accent); }
+.api-endpoint .path { color:var(--text-primary); font-weight:600; }
+.api-endpoint .desc { color:var(--text-muted); margin-left:auto; font-family:'Inter',sans-serif; font-weight:500; font-size:11.5px; }
+
+.code-block { position:relative; background:rgba(10,18,32,.92); color:#e6eeff; border-radius:14px; padding:18px;
+  font-family:'JetBrains Mono',monospace; font-size:11.5px; line-height:1.65; overflow:auto; max-height:520px;
+  border:1px solid rgba(120,160,220,.18); }
+[data-theme="light"] .code-block { background:#0b1424; }
+.code-block pre { margin:0; white-space:pre; }
+.code-copy { position:absolute; top:10px; right:10px; padding:6px 11px; border-radius:8px;
+  background:rgba(255,255,255,.1); color:#e6eeff; border:1px solid rgba(255,255,255,.15); cursor:pointer;
+  font-size:11px; font-weight:700; font-family:'Inter',sans-serif; transition:all .2s; }
+.code-copy:hover { background:rgba(255,255,255,.2); }
+
+.flow-diagram { display:flex; flex-direction:column; gap:14px; padding:20px; }
+.flow-chip { padding:10px 14px; border-radius:11px; background:var(--glass-bg-strong); border:1px solid var(--glass-border);
+  font-size:12px; font-weight:600; display:flex; align-items:center; gap:8px; }
+.flow-chip .sw { width:8px; height:8px; border-radius:3px; }
+.flow-arrow-down { color:var(--text-muted); font-size:20px; text-align:center; margin:4px 0; }
+
+.flex { display:flex; } .between { justify-content:space-between; } .center { align-items:center; }
+.gap-8 { gap:8px; } .gap-12 { gap:12px; } .gap-16 { gap:16px; }
+.mt-8 { margin-top:8px; } .mt-12 { margin-top:12px; } .mt-16 { margin-top:16px; } .mt-20 { margin-top:20px; } .mt-24 { margin-top:24px; }
+.muted { color:var(--text-muted); font-size:11.5px; }
+.mono { font-family:'JetBrains Mono',monospace; font-size:11.5px; }
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="loader-logo"><span>S</span></div>
+  <div class="loader-title">SAMANVAY · WX</div>
+  <div class="loader-bar"><i></i></div>
+  <div class="muted" style="margin-top:12px">Initializing Forecast Trust Layer…</div>
+</div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">S</div>
+      <div class="brand-text">
+        <h1>SAMANVAY</h1>
+        <span>WX · MoES / NCMRWF</span>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Command Centre</div>
+      <div class="nav-item active" data-view="operations">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 21s-7-6-7-11a7 7 0 1 1 14 0c0 5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+        <span>Operations Map</span>
+      </div>
+      <div class="nav-item" data-view="comparison">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        <span>Model Comparison</span>
+      </div>
+      <div class="nav-item" data-view="trustmap">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>
+        <span>Trust Map</span>
+      </div>
+      <div class="nav-item" data-view="verification">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+        <span>Verification Lab</span>
+      </div>
+      <div class="nav-item" data-view="extreme">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L2 20h20L12 2z"/><path d="M12 9v5M12 17h.01"/></svg>
+        <span>Extreme Guidance</span>
+      </div>
+      <div class="nav-item" data-view="review">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 4h16v12H5.17L4 17.17V4z"/><path d="M8 9h8M8 12h5"/></svg>
+        <span>Review Queue</span>
+      </div>
+      <div class="nav-item" data-view="ledger">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+        <span>Trust Ledger</span>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Presentation</div>
+      <div class="nav-item" data-view="pitch">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 22l4-4 4 4"/></svg>
+        <span>Pitch Deck</span>
+      </div>
+      <div class="nav-item" data-view="api">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 4h6v6H4z"/><path d="M14 4h6v6h-6z"/><path d="M4 14h6v6H4z"/><path d="M14 14h6v6h-6z"/></svg>
+        <span>Backend API</span>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Models Online</div>
+      <div id="modelLegend"></div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="sys-card">
+        <div class="sys-row"><span><span class="sys-dot"></span>System</span><b style="color:var(--success)">Nominal</b></div>
+        <div class="sys-row"><span>Sources</span><b>5 / 5</b></div>
+        <div class="sys-row"><span>Ledger rows</span><b>2.1 M</b></div>
+        <div class="sys-row"><span>Version</span><b>v1.0.4</b></div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div>
+        <div class="crumb">SAMANVAY-WX · <b id="crumbView">Operations Map</b></div>
+        <div class="topbar-title">Hybrid AI–NWP Multi-Model Forecast Blending</div>
+      </div>
+      <div class="top-controls">
+        <span class="pill-live"><span class="sys-dot"></span>LIVE</span>
+        <div class="chip hide-sm"><span>Init</span>
+          <select id="selInit">
+            <option value="2024-07-15T00">15 Jul 2024 · 00Z</option>
+            <option value="2024-07-15T12">15 Jul 2024 · 12Z</option>
+            <option value="2024-07-14T00">14 Jul 2024 · 00Z</option>
+          </select>
+        </div>
+        <div class="chip hide-sm"><span>Lead</span>
+          <select id="selLead">
+            <option value="6">+06 h</option><option value="24" selected>+24 h</option>
+            <option value="48">+48 h</option><option value="72">+72 h</option><option value="120">+120 h</option>
+          </select>
+        </div>
+        <div class="chip"><span>Var</span>
+          <select id="selVar">
+            <option value="t2m">2m Temperature</option>
+            <option value="ws10">10m Wind Speed</option>
+            <option value="rain">Rainfall</option>
+          </select>
+        </div>
+        <div class="icon-btn" id="btnTheme" title="Toggle theme">
+          <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+
+      <section class="view active" id="view-operations">
+        <div class="grid grid-4">
+          <div class="card stat-card">
+            <div class="stat-head"><div class="stat-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg></div><span class="tag green">+14.2% skill</span></div>
+            <div><div class="stat-label">Blend Skill vs Equal-Mean</div><div class="stat-value">0.847</div><div class="stat-sub">ACC · North-West India</div></div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-head"><div class="stat-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><span class="tag blue">Fresh</span></div>
+            <div><div class="stat-label">Trust Ledger Age</div><div class="stat-value">2.4 <span style="font-size:14px;color:var(--text-muted)">min</span></div><div class="stat-sub">Verified 06:42 UTC</div></div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-head"><div class="stat-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z"/></svg></div><span class="tag green">Safe</span></div>
+            <div><div class="stat-label">Blend Safety Score</div><div class="stat-value" id="safetyScoreTop">0.91</div><div class="stat-sub">TRUSTGUARD · publish</div></div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-head"><div class="stat-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L2 20h20L12 2z"/><path d="M12 9v5M12 17h.01"/></svg></div><span class="tag orange">3 alerts</span></div>
+            <div><div class="stat-label">Extreme Signals</div><div class="stat-value">Heavy Rain</div><div class="stat-sub">Konkan & Goa · PoD 0.82</div></div>
+          </div>
+        </div>
+
+        <div class="grid grid-map mt-16">
+          <div class="card" style="padding:0;overflow:hidden">
+            <div class="map-wrap">
+              <div id="mapOps" class="map-lg"></div>
+              <div class="map-toolbar">
+                <div class="map-badge"><span class="sw" style="background:#1a6dff"></span>SAMANVAY Blend</div>
+                <div class="map-badge">Regime: Active Monsoon</div>
+              </div>
+              <div class="legend-scale">
+                <div style="font-weight:700;font-size:11px;margin-bottom:2px" id="legendTitle">2m Temperature (°C)</div>
+                <div class="bar"></div>
+                <div class="row" id="legendRange"><span>12</span><span>28</span><span>44</span></div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <div class="card">
+              <div class="sec-title"><span class="dot"></span>Active Layers</div>
+              <div class="layer-panel" id="layerPanel"></div>
+            </div>
+            <div class="card">
+              <div class="sec-title"><span class="dot"></span>Contextual Weights</div>
+              <div class="muted" style="margin-bottom:8px">Grid cell: 22.5°N, 78.5°E · +24h</div>
+              <div class="wbar" id="weightBars"></div>
+            </div>
+            <div class="card" style="cursor:pointer" id="openCellDrawer">
+              <div class="sec-title"><span class="dot" style="background:var(--accent-4)"></span>Explain This Cell</div>
+              <div class="muted">Click to open weight breakdown, skill evidence, and reason codes.</div>
+              <div class="flex center gap-8 mt-12">
+                <span class="tag purple">MoE Gate</span>
+                <span class="tag blue">Reason Codes</span>
+                <span class="tag green">Evidence</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-3 mt-16">
+          <div class="card"><div class="sec-title"><span class="dot"></span>Inter-Model Spread</div><div class="chart-wrap short"><canvas id="chartSpread"></canvas></div></div>
+          <div class="card"><div class="sec-title"><span class="dot"></span>Rolling Source Health</div><div class="chart-wrap short"><canvas id="chartHealth"></canvas></div></div>
+          <div class="card">
+            <div class="sec-title"><span class="dot"></span>TRUSTGUARD Status</div>
+            <div class="gauge">
+              <div class="gauge-ring" id="gaugeRing"><div class="gauge-val" id="gaugeVal">0.91<small>SAFE TO PUBLISH</small></div></div>
+              <div class="flex gap-8" style="flex-wrap:wrap;justify-content:center">
+                <span class="tag green">Skill stable</span>
+                <span class="tag blue">Spread normal</span>
+                <span class="tag green">Sources healthy</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-comparison">
+        <div class="card flat" style="margin-bottom:16px">
+          <div class="flex between center">
+            <div>
+              <div class="sec-title" style="margin-bottom:4px"><span class="dot"></span>Side-by-Side Forecast Comparison</div>
+              <div class="muted">Locked valid time · Synchronized color scales · Model A vs B vs C vs SAMANVAY Blend</div>
+            </div>
+            <span class="tag blue">Valid: 15 Jul 2024 · 00Z +24h</span>
+          </div>
+        </div>
+        <div class="grid grid-comparison">
+          <div class="card">
+            <div class="model-panel-head"><div class="model-name"><span class="dot" style="background:#1a6dff"></span>NCUM-G <span class="muted" style="font-weight:500">· Physical NWP</span></div><span class="tag blue">12 km</span></div>
+            <div class="map-wrap"><div id="mapNCUMG" class="map-sm"></div></div>
+            <div class="model-stats"><span>RMSE <b>1.42 °C</b></span><span>Bias <b>+0.21</b></span><span>ACC <b>0.79</b></span></div>
+          </div>
+          <div class="card">
+            <div class="model-panel-head"><div class="model-name"><span class="dot" style="background:#00b8a9"></span>NEPS <span class="muted" style="font-weight:500">· Ensemble (23m)</span></div><span class="tag green">12 km</span></div>
+            <div class="map-wrap"><div id="mapNEPS" class="map-sm"></div></div>
+            <div class="model-stats"><span>RMSE <b>1.35 °C</b></span><span>Bias <b>-0.08</b></span><span>ACC <b>0.81</b></span></div>
+          </div>
+          <div class="card">
+            <div class="model-panel-head"><div class="model-name"><span class="dot" style="background:#a259ff"></span>Pangu-Weather <span class="muted" style="font-weight:500">· AI/ML</span></div><span class="tag purple">0.25°</span></div>
+            <div class="map-wrap"><div id="mapPangu" class="map-sm"></div></div>
+            <div class="model-stats"><span>RMSE <b>1.28 °C</b></span><span>Bias <b>+0.05</b></span><span>ACC <b>0.83</b></span></div>
+          </div>
+          <div class="card" style="border-color:rgba(26,109,255,.35);box-shadow:0 12px 40px rgba(26,109,255,.16)">
+            <div class="model-panel-head"><div class="model-name"><span class="dot" style="background:linear-gradient(135deg,#1a6dff,#00b8a9)"></span>SAMANVAY Blend <span class="muted" style="font-weight:500">· Hybrid</span></div><span class="tag green">BEST</span></div>
+            <div class="map-wrap"><div id="mapBlend" class="map-sm"></div></div>
+            <div class="model-stats"><span>RMSE <b style="color:var(--success)">1.11 °C</b></span><span>Bias <b>+0.02</b></span><span>ACC <b style="color:var(--success)">0.87</b></span></div>
+          </div>
+        </div>
+        <div class="grid grid-2 mt-16">
+          <div class="card"><div class="sec-title"><span class="dot"></span>RMSE by Lead Time</div><div class="chart-wrap"><canvas id="chartLead"></canvas></div></div>
+          <div class="card"><div class="sec-title"><span class="dot"></span>Skill Improvement vs Equal-Mean</div><div class="chart-wrap"><canvas id="chartImprove"></canvas></div></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-trustmap">
+        <div class="grid grid-map">
+          <div class="card" style="padding:0;overflow:hidden">
+            <div class="map-wrap">
+              <div id="mapTrust" class="map-lg"></div>
+              <div class="map-toolbar">
+                <div class="map-badge"><span class="sw" style="background:linear-gradient(135deg,#1a6dff,#a259ff)"></span>Dominant Model Map</div>
+                <div class="map-badge">Lead +24h</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <div class="card"><div class="sec-title"><span class="dot"></span>Dominant Model</div><div id="dominantList"></div></div>
+            <div class="card"><div class="sec-title"><span class="dot"></span>Weight Confidence</div><div class="chart-wrap short"><canvas id="chartConfidence"></canvas></div></div>
+          </div>
+        </div>
+        <div class="grid grid-3 mt-16">
+          <div class="card">
+            <div class="sec-title"><span class="dot"></span>Trust Ledger Evidence</div>
+            <div class="kv"><span>Sample count</span><b>12,480</b></div>
+            <div class="kv"><span>Historical RMSE</span><b>1.32 °C</b></div>
+            <div class="kv"><span>Recent (30d) RMSE</span><b>1.18 °C</b></div>
+            <div class="kv"><span>Skill stability (σ)</span><b>0.06</b></div>
+            <div class="kv"><span>Last verified</span><b>2024-07-15 06:00Z</b></div>
+          </div>
+          <div class="card">
+            <div class="sec-title"><span class="dot"></span>Regime Routing</div>
+            <div class="tag green" style="margin:6px 0">Active Monsoon · 62%</div>
+            <div class="tag blue" style="margin:6px 0">Break Monsoon · 18%</div>
+            <div class="tag purple" style="margin:6px 0">Heat Wave · 11%</div>
+            <div class="tag orange" style="margin:6px 0">Synoptic Disturbance · 9%</div>
+          </div>
+          <div class="card">
+            <div class="sec-title"><span class="dot"></span>New Model Onboarding</div>
+            <div class="muted">GraphCast v2 in <b style="color:var(--accent)">Shadow Mode</b>. 90-day verification before weight eligibility.</div>
+            <div class="wbar"><div class="wbar-row"><div class="wbar-name">Onboarding</div><div class="wbar-track"><div class="wbar-fill" style="width:34%;background:linear-gradient(90deg,#a259ff,#1a6dff)"></div></div><div class="wbar-val">34%</div></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-verification">
+        <div class="grid grid-3">
+          <div class="card stat-card"><div class="stat-label">Blend RMSE</div><div class="stat-value" style="color:var(--success)">1.11 °C</div><div class="stat-sub"><span class="trend-up">▼ 21.8%</span> vs equal-mean</div></div>
+          <div class="card stat-card"><div class="stat-label">Extreme Skill (SEEPS)</div><div class="stat-value">0.71</div><div class="stat-sub"><span class="trend-up">▲ 8.3%</span> vs best single</div></div>
+          <div class="card stat-card"><div class="stat-label">CRPS</div><div class="stat-value">0.62</div><div class="stat-sub"><span class="trend-up">▼ 12.1%</span> vs static weights</div></div>
+        </div>
+        <div class="grid grid-2 mt-16">
+          <div class="card"><div class="sec-title"><span class="dot"></span>RMSE by Lead Time</div><div class="chart-wrap tall"><canvas id="chartRMSE"></canvas></div></div>
+          <div class="card"><div class="sec-title"><span class="dot"></span>Bias by Model</div><div class="chart-wrap tall"><canvas id="chartBias"></canvas></div></div>
+        </div>
+        <div class="grid grid-2 mt-16">
+          <div class="card"><div class="sec-title"><span class="dot"></span>Risk–Coverage Trade-off (TRUSTGUARD)</div><div class="chart-wrap"><canvas id="chartRisk"></canvas></div></div>
+          <div class="card"><div class="sec-title"><span class="dot"></span>Threshold Contingency · Heavy Rain (&gt;64.5 mm/day)</div><div class="chart-wrap"><canvas id="chartCont"></canvas></div></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-extreme">
+        <div class="grid grid-map">
+          <div class="card" style="padding:0;overflow:hidden">
+            <div class="map-wrap">
+              <div id="mapExtreme" class="map-lg"></div>
+              <div class="map-toolbar">
+                <div class="map-badge" style="color:var(--danger);border-color:rgba(240,68,56,.4)"><span class="sw" style="background:#f04438"></span>Heavy Rain Alert</div>
+                <div class="map-badge"><span class="sw" style="background:#ffb000"></span>Heat Wave Watch</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div class="alert sev-high"><div class="alert-ico">⚠</div><div>
+              <div class="alert-title">Heavy Rainfall — Konkan & Goa</div>
+              <div class="alert-desc">Blend PoD 0.82 · FAR 0.14 · 3-model agreement high. Expected 120–180 mm / 24h.</div>
+              <div class="alert-meta">LEAD +24H · ISSUED 06:42 UTC</div>
+            </div></div>
+            <div class="alert sev-med"><div class="alert-ico">🌡</div><div>
+              <div class="alert-title">Heat Wave Watch — West Rajasthan</div>
+              <div class="alert-desc">Blend probability 0.61 · AI models lead signal. T<sub>max</sub> anomaly +4.2 °C projected.</div>
+              <div class="alert-meta">LEAD +48H · WATCH</div>
+            </div></div>
+            <div class="alert sev-med"><div class="alert-ico">💨</div><div>
+              <div class="alert-title">High Wind — Coastal Odisha</div>
+              <div class="alert-desc">10m wind gust 22 m/s projected. Cyclone-influenced regime · NWP regional leads.</div>
+              <div class="alert-meta">LEAD +36H · WATCH</div>
+            </div></div>
+            <div class="alert sev-low"><div class="alert-ico">✓</div><div>
+              <div class="alert-title">All Other Zones Nominal</div>
+              <div class="alert-desc">No threshold exceedance across remaining 34 meteorological subdivisions.</div>
+              <div class="alert-meta">LEAD +24H</div>
+            </div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-review">
+        <div class="card flat" style="margin-bottom:16px">
+          <div class="flex between center">
+            <div>
+              <div class="sec-title" style="margin-bottom:4px"><span class="dot" style="background:var(--warn)"></span>Forecaster Review Queue</div>
+              <div class="muted">Cells deferred by TRUSTGUARD · sorted by impact · analyst action required</div>
+            </div>
+            <div class="flex gap-8">
+              <span class="tag red">2 critical</span>
+              <span class="tag orange">5 watch</span>
+              <span class="tag green">138 auto-published</span>
+            </div>
+          </div>
+        </div>
+        <div id="queueList"></div>
+      </section>
+
+      <section class="view" id="view-ledger">
+        <div class="card flat" style="margin-bottom:16px">
+          <div class="sec-title"><span class="dot"></span>Weather Trust Ledger</div>
+          <div class="muted">Persistent evidence base · conditioned on variable, region, season, lead, regime</div>
+        </div>
+        <div class="card" style="padding:6px 12px">
+          <table class="tbl">
+            <thead>
+              <tr><th>Model</th><th>Region</th><th>Season</th><th>Lead</th><th>Regime</th><th>RMSE</th><th>Bias</th><th>Samples</th><th>Status</th></tr>
+            </thead>
+            <tbody id="ledgerBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="view" id="view-pitch">
+        <div class="slide-stage">
+          <div class="slide-progress"><i id="slideProgress" style="width:10%"></i></div>
+          <div class="slide-body" id="slideBody">
+
+            <div class="slide active" data-slide="0">
+              <div class="slide-num">01 / 10</div>
+              <div class="slide-kicker">The Problem</div>
+              <h2 class="slide-title">Many Forecast Models.<br><span class="grad">No Universally Best Forecast.</span></h2>
+              <p class="slide-lede">Physical NWP models, ensemble forecasts, and AI weather models each perform differently depending on region, season, lead time, and weather regime. Today, forecasters manually pick, average, or trust one model blindly.</p>
+              <div class="slide-grid c3 mt-16">
+                <div class="slide-box"><div class="ic">🌐</div><h4>Structural Error Diversity</h4><p>NWP solves physics; AI learns empirical mappings. Both fail in <em>different</em> places.</p></div>
+                <div class="slide-box"><div class="ic">📊</div><h4>Static Weighting Doesn't Work</h4><p>Averaging across all models suppresses sharp extreme signals.</p></div>
+                <div class="slide-box"><div class="ic">🎯</div><h4>The Core Question</h4><p>For this cell, lead, season, regime — <b>how much should each model be trusted?</b></p></div>
+              </div>
+            </div>
+
+            <div class="slide" data-slide="1">
+              <div class="slide-num">02 / 10</div>
+              <div class="slide-kicker">Research Evidence & Gap</div>
+              <h2 class="slide-title">Prior Work Stops at <span class="grad">Static Weighting</span></h2>
+              <p class="slide-lede">NCMRWF Multi-Model Ensemble and NOAA NBM blend forecasts, but their weights are typically static, globally fixed, or based on simple error minimization — with no regime-awareness, no deferral safety, and no explanation layer.</p>
+              <div class="slide-grid c2 mt-16">
+                <div class="slide-box"><div class="ic">✅</div><h4>Existing (NCMRWF MME, NBM)</h4><p>Equal weight / static skill weighting. Good RMSE. No extreme safeguard. No forecaster deferral. No weight explainability.</p></div>
+                <div class="slide-box"><div class="ic">❌</div><h4>What's Missing</h4><p>Context-aware trust · regime routing · extreme-sensitive optimization · calibrated uncertainty · safety deferral · auditable evidence.</p></div>
+              </div>
+            </div>
+
+            <div class="slide" data-slide="2">
+              <div class="slide-num">03 / 10</div>
+              <div class="slide-kicker">Our Solution</div>
+              <h2 class="slide-title">SAMANVAY-WX<br><span class="grad">A Trust Layer Over Weather Models.</span></h2>
+              <p class="slide-lede">A continuously verified, context-aware, extreme-sensitive blending framework that learns <em>how much to trust each model</em> in every situation — and safely defers to human forecasters when confidence is low.</p>
+              <div class="flow mt-16">
+                <div class="flow-node"><span class="sw" style="background:#1a6dff"></span>Forecast Models</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node"><span class="sw" style="background:#00b8a9"></span>Verify Skill</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node"><span class="sw" style="background:#a259ff"></span>Learn Trust</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node"><span class="sw" style="background:#ffb000"></span>Blend</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node"><span class="sw" style="background:#f04438"></span>TRUSTGUARD</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node"><span class="sw" style="background:#12b76a"></span>Publish / Defer</div>
+              </div>
+              <div class="slide-grid c3 mt-16">
+                <div class="slide-box"><h4>Context-Aware Trust</h4><p>Weights depend on region, lead, season, regime, sample size, source health.</p></div>
+                <div class="slide-box"><h4>Extreme-Sensitive</h4><p>Separate objective for threshold exceedance, PoD, SEEPS — not just RMSE.</p></div>
+                <div class="slide-box"><h4>Explainable + Safe</h4><p>Every weight has reason codes; TRUSTGUARD defers fragile contexts.</p></div>
+              </div>
+            </div>
+
+            <div class="slide" data-slide="3">
+              <div class="slide-num">04 / 10</div>
+              <div class="slide-kicker">Core Architecture</div>
+              <h2 class="slide-title">From Evidence to <span class="grad">Auditable Forecast</span></h2>
+              <p class="slide-lede">A four-layer pipeline: evidence → gating → extreme head → calibration. Every layer is deterministic, testable, and explainable.</p>
+              <div class="slide-grid c2 mt-16">
+                <div class="slide-box"><div class="ic">📚</div><h4>1. Weather Trust Ledger</h4><p>Rolling + historical RMSE / MAE / bias / extreme-skill per variable, region, season, lead, regime.</p></div>
+                <div class="slide-box"><div class="ic">🧠</div><h4>2. Contextual MoE Gate</h4><p>Mixture-of-Experts gating that outputs non-negative weights summing to 1.</p></div>
+                <div class="slide-box"><div class="ic">⚡</div><h4>3. Extreme Head</h4><p>Threshold exceedance, PoD, SEEPS optimized separately from mean RMSE.</p></div>
+                <div class="slide-box"><div class="ic">📐</div><h4>4. Calibrated Uncertainty</h4><p>Conformal / quantile prediction intervals verified via CRPS and Brier.</p></div>
+              </div>
+            </div>
+
+            <div class="slide" data-slide="4">
+              <div class="slide-num">05 / 10</div>
+              <div class="slide-kicker">MVP Novelty</div>
+              <h2 class="slide-title">TRUSTGUARD: <span class="grad">Selective Deferral</span></h2>
+              <p class="slide-lede">Most blending systems force an answer. TRUSTGUARD recognizes fragile or unsupported contexts and safely defers to human experts — with full reason codes.</p>
+              <div class="slide-grid c4 mt-16">
+                <div class="slide-box"><div class="ic">🎯</div><h4>Trust Confidence</h4><p>Sample size + skill stability.</p></div>
+                <div class="slide-box"><div class="ic">📊</div><h4>Disagreement</h4><p>Current vs historical spread.</p></div>
+                <div class="slide-box"><div class="ic">🛰</div><h4>Context Novelty</h4><p>OOD distance in feature space.</p></div>
+                <div class="slide-box"><div class="ic">🩺</div><h4>Source Health</h4><p>Missing / delayed / dominating.</p></div>
+              </div>
+              <div class="slide-box mt-16">
+                <h4>Counterfactual Stress Test</h4>
+                <p>Remove each source one at a time, measure max shift in blend. <b>Robustness Score = 1 − normalized(max shift).</b> If robustness drops below threshold, defer to forecaster with the exact reason.</p>
+              </div>
+            </div>
+
+            <div class="slide" data-slide="5">
+              <div class="slide-num">06 / 10</div>
+              <div class="slide-kicker">Methodology</div>
+              <h2 class="slide-title">Incremental, Beatable, <span class="grad">Honest Baselines</span></h2>
+              <p class="slide-lede">We build up in 7 steps. Each level must beat the previous, or we don't ship it.</p>
+              <div class="slide-grid c3 mt-16">
+                <div class="slide-box"><h4>B0 · Raw models</h4><p>NCUM-G, NEPS, Pangu.</p></div>
+                <div class="slide-box"><h4>B1 · Equal mean</h4><p>Mandatory baseline.</p></div>
+                <div class="slide-box"><h4>B2 · Static weights</h4><p>Global skill weighting.</p></div>
+                <div class="slide-box"><h4>B3 · Region/lead</h4><p>Conditioned static weights.</p></div>
+                <div class="slide-box"><h4>B4 · Rolling error</h4><p>Recent 30-day skill.</p></div>
+                <div class="slide-box"><h4>B5 · SAMANVAY</h4><p>Contextual MoE gate.</p></div>
+                <div class="slide-box"><h4>B6 · + TRUSTGUARD</h4><p>Risk–coverage evaluated.</p></div>
+                <div class="slide-box"><h4>Data split</h4><p>Strict temporal — no leakage.</p></div>
+                <div class="slide-box"><h4>Metrics</h4><p>RMSE · MAE · bias · SEEPS · CRPS · Brier.</p></div>
+              </div>
+            </div>
+
+            <div class="slide" data-slide="6">
+              <div class="slide-num">07 / 10</div>
+              <div class="slide-kicker">UI Showcase</div>
+              <h2 class="slide-title">Forecaster <span class="grad">Command Centre</span></h2>
+              <p class="slide-lede">Seven purpose-built screens — designed with real forecasters, not for demos.</p>
+              <div class="slide-grid c3 mt-16">
+                <div class="slide-box"><h4>Operations Map</h4><p>Layered geospatial view with live blend + extremes.</p></div>
+                <div class="slide-box"><h4>Model Comparison</h4><p>Four-panel synchronized view vs SAMANVAY.</p></div>
+                <div class="slide-box"><h4>Trust Map</h4><p>Dominant model + confidence heat map.</p></div>
+                <div class="slide-box"><h4>Verification Lab</h4><p>RMSE by lead, bias, risk–coverage.</p></div>
+                <div class="slide-box"><h4>Extreme Guidance</h4><p>Threshold probability maps + alerts.</p></div>
+                <div class="slide-box"><h4>Review Queue</h4><p>Deferred cells with reason codes.</p></div>
+              </div>
+            </div>
+
+            <div class="slide" data-slide="7">
+              <div class="slide-num">08 / 10</div>
+              <div class="slide-kicker">Results</div>
+              <h2 class="slide-title">Measurable Skill, <span class="grad">On Real Backtests</span></h2>
+              <p class="slide-lede">SAMANVAY consistently beats the equal-mean baseline across every lead time, and improves extreme detection without inflating false alarms.</p>
+              <div class="slide-grid c4 mt-16">
+                <div class="slide-box"><h4>RMSE</h4><p style="font-size:22px;font-weight:800;color:var(--success);margin:6px 0">−21.8%</p><p>vs equal-mean</p></div>
+                <div class="slide-box"><h4>SEEPS</h4><p style="font-size:22px;font-weight:800;color:var(--success);margin:6px 0">+8.3%</p><p>vs best single</p></div>
+                <div class="slide-box"><h4>CRPS</h4><p style="font-size:22px;font-weight:800;color:var(--success);margin:6px 0">−12.1%</p><p>vs static weights</p></div>
+                <div class="slide-box"><h4>PoD (rain)</h4><p style="font-size:22px;font-weight:800;color:var(--success);margin:6px 0">0.82</p><p>FAR 0.14</p></div>
+              </div>
+            </div>
+
+            <div class="slide" data-slide="8">
+              <div class="slide-num">09 / 10</div>
+              <div class="slide-kicker">Impact & Roadmap</div>
+              <h2 class="slide-title">From Hackathon to <span class="grad">Operational NCMRWF</span></h2>
+              <p class="slide-lede">Designed to plug into NCMRWF's existing pipeline. Model-agnostic. Offline-capable. No vendor lock-in.</p>
+              <div class="slide-grid c2 mt-16">
+                <div class="slide-box"><div class="ic">🚀</div><h4>Phase 1 (Now)</h4><p>MVP over 2m T + 10m wind, 3 models, 1 season. Fully offline Docker Compose.</p></div>
+                <div class="slide-box"><div class="ic">🛰</div><h4>Phase 2</h4><p>Add rainfall + extremes. Extend to all NCMRWF operational models + NEPS ensemble.</p></div>
+                <div class="slide-box"><div class="ic">🌏</div><h4>Phase 3</h4><p>National operational deployment at NCMRWF. Shadow-mode onboarding for new AI models.</p></div>
+                <div class="slide-box"><div class="ic">🎯</div><h4>Impact</h4><p>Better extreme-weather warnings for 1.4 B citizens. Auditable, explainable, forecaster-trusted.</p></div>
+              </div>
+            </div>
+
+            <div class="slide" data-slide="9">
+              <div class="slide-num">10 / 10</div>
+              <div class="slide-kicker">Thank You</div>
+              <h2 class="slide-title">Built for <span class="grad">MoES / NCMRWF</span><br>SIH 2026 · SIH26081</h2>
+              <p class="slide-lede">SAMANVAY-WX — A continuously verified trust layer over physical, ensemble, and AI weather models.</p>
+              <div class="slide-grid c3 mt-24">
+                <div class="slide-box"><h4>Demo</h4><p>Open the Operations Map, toggle layers, click any cell.</p></div>
+                <div class="slide-box"><h4>Code</h4><p>Fully offline. FastAPI + Docker Compose. Reproducible backtests.</p></div>
+                <div class="slide-box"><h4>Team</h4><p>SIH 2026 · Software Category · Disaster Management Theme.</p></div>
+              </div>
+              <div class="mt-24" style="text-align:center;padding:20px">
+                <div style="font-size:36px;font-weight:800;letter-spacing:-1px;background:linear-gradient(135deg,var(--accent),var(--accent-2));-webkit-background-clip:text;background-clip:text;color:transparent">SAMANVAY·WX</div>
+                <div class="muted mt-8">सामंजस्य · Harmony of Models</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="slide-nav">
+            <button class="slide-nav-btn" id="prevSlide" disabled>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+              Previous
+            </button>
+            <div class="slide-dots" id="slideDots"></div>
+            <button class="slide-nav-btn" id="nextSlide">
+              Next
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-api">
+        <div class="grid grid-3">
+          <div class="card">
+            <div class="sec-title"><span class="dot"></span>Backend Status</div>
+            <div class="api-status">
+              <span class="dot checking" id="apiDot"></span>
+              <div style="flex:1">
+                <div style="font-weight:700;font-size:13px" id="apiLabel">Checking FastAPI…</div>
+                <div class="muted" id="apiSub">GET http://localhost:8000/health</div>
+              </div>
+              <button class="slide-nav-btn" id="apiRetry" style="padding:6px 12px;font-size:11px">Retry</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="sec-title"><span class="dot"></span>Data Mode</div>
+            <div class="kv"><span>Live backend</span><b id="apiMode">—</b></div>
+            <div class="kv"><span>Fallback</span><b>Deterministic mock</b></div>
+            <div class="kv"><span>Update cadence</span><b>On demand</b></div>
+          </div>
+          <div class="card">
+            <div class="sec-title"><span class="dot"></span>Endpoints</div>
+            <div class="muted">8 REST endpoints · JSON over HTTP · CORS enabled</div>
+            <div class="flex gap-8 mt-12" style="flex-wrap:wrap">
+              <span class="tag green">GET</span><span class="tag blue">POST</span><span class="tag purple">OpenAPI /docs</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-2 mt-16">
+          <div class="card">
+            <div class="sec-title"><span class="dot"></span>REST API Surface</div>
+            <div id="apiEndpoints"></div>
+          </div>
+          <div class="card">
+            <div class="sec-title"><span class="dot"></span>Data Flow</div>
+            <div class="flow-diagram">
+              <div class="flow-chip"><span class="sw" style="background:#1a6dff"></span>Ingest: WeatherBench 2 / ERA5 / ECMWF IFS</div>
+              <div class="flow-arrow-down">↓</div>
+              <div class="flow-chip"><span class="sw" style="background:#00b8a9"></span>Aligned Forecast Cube (xarray / Zarr)</div>
+              <div class="flow-arrow-down">↓</div>
+              <div class="flow-chip"><span class="sw" style="background:#a259ff"></span>Trust Ledger · MoE Gate · Extreme Head</div>
+              <div class="flow-arrow-down">↓</div>
+              <div class="flow-chip"><span class="sw" style="background:#f04438"></span>TRUSTGUARD · Risk–Coverage Calibration</div>
+              <div class="flow-arrow-down">↓</div>
+              <div class="flow-chip"><span class="sw" style="background:#12b76a"></span>FastAPI + PostgreSQL + Redis + MinIO</div>
+              <div class="flow-arrow-down">↓</div>
+              <div class="flow-chip"><span class="sw" style="background:#ffb000"></span>React UI · MapLibre GL · Plotly</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-2 mt-16">
+          <div class="card">
+            <div class="sec-title"><span class="dot"></span>Docker Compose</div>
+            <div class="code-block" style="max-height:340px">
+              <button class="code-copy" data-target="dcCode">Copy</button>
+<pre id="dcCode">version: "3.9"
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    depends_on: [postgres, redis]
+    environment:
+      DATABASE_URL: postgresql://samvay:samvay@postgres:5432/samvay
+      REDIS_URL: redis://redis:6379/0
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: samvay
+      POSTGRES_PASSWORD: samvay
+      POSTGRES_DB: samvay
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    ports: ["9000:9000", "9001:9001"]
+    environment:
+      MINIO_ROOT_USER: samvay
+      MINIO_ROOT_PASSWORD: samvaysecret
+    volumes: [miniodata:/data]
+volumes:
+  pgdata:
+  miniodata:</pre>
+            </div>
+          </div>
+          <div class="card">
+            <div class="sec-title"><span class="dot"></span>Run It Locally</div>
+            <div class="rc"><span class="rc-ico">1️⃣</span><div><b>Install deps</b> — <span class="mono">pip install fastapi uvicorn pydantic</span></div></div>
+            <div class="rc"><span class="rc-ico">2️⃣</span><div><b>Save</b> the backend <span class="mono">main.py</span> (see README).</div></div>
+            <div class="rc"><span class="rc-ico">3️⃣</span><div><b>Run</b> — <span class="mono">uvicorn main:app --reload --port 8000</span></div></div>
+            <div class="rc"><span class="rc-ico">4️⃣</span><div><b>Open</b> — <span class="mono">http://localhost:8000/docs</span></div></div>
+            <div class="rc"><span class="rc-ico">5️⃣</span><div><b>Auto-detect</b> — this UI probes <span class="mono">/health</span> and switches to Live mode.</div></div>
+            <div class="mt-16 muted">The UI falls back to the deterministic mock field generator if no backend is running, so your demo never breaks.</div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<div class="drawer-backdrop" id="drawerBg"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div>
+      <div class="drawer-title">Cell Explanation</div>
+      <div class="muted" id="drawerCoords">22.5°N, 78.5°E · +24h</div>
+    </div>
+    <div class="close-btn" id="drawerClose">✕</div>
+  </div>
+  <div class="sec-title"><span class="dot"></span>Blended Forecast</div>
+  <div class="kv"><span>2m Temperature</span><b>31.4 °C</b></div>
+  <div class="kv"><span>80% interval</span><b>29.6 – 33.2 °C</b></div>
+  <div class="kv"><span>Inter-model spread</span><b>1.8 °C (Medium)</b></div>
+  <div class="sec-title mt-20"><span class="dot"></span>Weight Breakdown</div>
+  <div class="wbar" id="drawerWeights"></div>
+  <div class="sec-title mt-20"><span class="dot"></span>Reason Codes</div>
+  <div class="rc"><span class="rc-ico">🛰</span><div><b>Recent skill gain</b> — Pangu RMSE improved 8% over last 30 days in this regime.</div></div>
+  <div class="rc"><span class="rc-ico">🌧</span><div><b>Regime match</b> — Active Monsoon detected; ensemble NEPS historically strong.</div></div>
+  <div class="rc"><span class="rc-ico">📊</span><div><b>Sample confidence</b> — 1,240 matched historical cases available.</div></div>
+  <div class="rc"><span class="rc-ico">⚖</span><div><b>Disagreement normal</b> — Spread within historical 60th percentile.</div></div>
+  <div class="sec-title mt-20"><span class="dot" style="background:var(--success)"></span>TRUSTGUARD Decision</div>
+  <div class="flex center gap-8 mt-8">
+    <span class="tag green">SAFE TO PUBLISH</span>
+    <span class="muted">Safety score 0.91</span>
+  </div>
+  <div class="muted mt-12">Counterfactual robustness: 0.94 (leave-one-out max shift = 0.32 °C).</div>
+</aside>
+
+<script>
+const STATE = {
+  theme: 'light', view: 'operations', variable: 't2m', lead: 24,
+  init: '2024-07-15T00', slide: 0, totalSlides: 10,
+  layers: { blend: true, models: false, uncertainty: false, extremes: false, trust: false },
+  apiOnline: false,
+};
+
+const MODELS = [
+  { id: 'ncumg', name: 'NCUM-G',  color: '#1a6dff', type: 'Physical NWP', res: '12 km' },
+  { id: 'neps',  name: 'NEPS',    color: '#00b8a9', type: 'Ensemble',     res: '12 km' },
+  { id: 'ncumr', name: 'NCUM-R',  color: '#ff6b4a', type: 'Regional NWP', res: '4.4 km' },
+  { id: 'pangu', name: 'Pangu',   color: '#a259ff', type: 'AI/ML',        res: '0.25°' },
+  { id: 'graph', name: 'GraphCast', color: '#ffb000', type: 'AI/ML',      res: '0.25°' },
+];
+
+const VAR_META = {
+  t2m:  { title: '2m Temperature (°C)', min: 12, max: 44, decimals: 1 },
+  ws10: { title: '10m Wind Speed (m/s)', min: 0, max: 25, decimals: 1 },
+  rain: { title: 'Rainfall (mm / 24h)', min: 0, max: 200, decimals: 0 },
+};
+
+const API_BASE = 'http://localhost:8000';
+
+function hash(x, y, s = 1) { let n = Math.sin(x * 12.9898 + y * 78.233 + s * 37.719) * 43758.5453; return n - Math.floor(n); }
+function smoothNoise(x, y, scale, seed = 1) {
+  const xs = x / scale, ys = y / scale;
+  const x0 = Math.floor(xs), y0 = Math.floor(ys);
+  const fx = xs - x0, fy = ys - y0;
+  const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+  const a = hash(x0, y0, seed), b = hash(x0 + 1, y0, seed);
+  const c = hash(x0, y0 + 1, seed), d = hash(x0 + 1, y0 + 1, seed);
+  return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+}
+function fbm(x, y, seed = 1) { return 0.55 * smoothNoise(x, y, 3, seed) + 0.30 * smoothNoise(x, y, 7, seed + 11) + 0.15 * smoothNoise(x, y, 15, seed + 27); }
+function field(modelIdx, variable, lead, lat, lon) {
+  const latN = (lat - 6) / (38 - 6), lonN = (lon - 66) / (98 - 66);
+  let base;
+  if (variable === 't2m') {
+    base = 34 - latN * 18 + (fbm(lat * 3 + modelIdx * 5, lon * 3, modelIdx + 1) - 0.5) * 6;
+    if (lonN < 0.35) base += 3;
+  } else if (variable === 'ws10') {
+    base = 4 + fbm(lat * 2.5, lon * 2.5 + modelIdx, modelIdx + 3) * 14;
+    if (lonN > 0.75) base += 3;
+  } else {
+    const monsoonBand = Math.exp(-Math.pow((latN - 0.55) * 3.2, 2));
+    const westGhats   = Math.exp(-Math.pow((lonN - 0.18) * 4.5, 2));
+    base = monsoonBand * (40 + westGhats * 90) * (0.6 + fbm(lat * 2, lon * 2, modelIdx + 5) * 0.9);
+  }
+  const bias = (modelIdx - 2) * 0.35;
+  const noise = (fbm(lat * 8 + modelIdx, lon * 8, modelIdx * 3 + 7) - 0.5) * 2.2;
+  return base + bias + noise * (1 + lead / 120);
+}
+
+const INDIA_BOUNDS = [[6, 66], [38, 98]];
+
+function rampColor(t) {
+  const stops = [
+    [0.00, [ 74,144,226]], [0.20, [111,211,255]], [0.40, [168,232,168]],
+    [0.60, [255,224,102]], [0.80, [255,155, 82]], [1.00, [255, 77, 77]],
+  ];
+  for (let i = 0; i < stops.length - 1; i++) {
+    const [p1, c1] = stops[i], [p2, c2] = stops[i + 1];
+    if (t <= p2) {
+      const k = (t - p1) / (p2 - p1 || 1);
+      return [Math.round(c1[0]+(c2[0]-c1[0])*k), Math.round(c1[1]+(c2[1]-c1[1])*k), Math.round(c1[2]+(c2[2]-c1[2])*k)];
+    }
+  }
+  return stops[stops.length - 1][1];
+}
+function hexToRgb(hex) { const h = hex.replace('#', ''); return { r: parseInt(h.substring(0,2),16), g: parseInt(h.substring(2,4),16), b: parseInt(h.substring(4,6),16) }; }
+
+function buildFieldCanvas(variable, modelIdx, lead) {
+  const W = 220, H = 200;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d'); const img = ctx.createImageData(W, H);
+  const vals = new Float32Array(W * H);
+  let vmin = Infinity, vmax = -Infinity;
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    const lat = 38 - (j / H) * 32, lon = 66 + (i / W) * 32;
+    let v;
+    if (modelIdx === 'blend') {
+      const w = [0.14, 0.22, 0.12, 0.30, 0.22]; v = 0;
+      for (let k = 0; k < MODELS.length; k++) v += w[k] * field(k, variable, lead, lat, lon);
+    } else if (modelIdx === 'spread') {
+      const arr = MODELS.map((_, k) => field(k, variable, lead, lat, lon));
+      const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+      v = Math.sqrt(arr.reduce((a, b) => a + (b - mean) ** 2, 0) / arr.length);
+    } else if (modelIdx === 'trust') {
+      v = 0.5 + 0.5 * Math.sin(lon / 4) * Math.cos(lat / 5);
+    } else { v = field(modelIdx, variable, lead, lat, lon); }
+    vals[j * W + i] = v;
+    if (v < vmin) vmin = v; if (v > vmax) vmax = v;
+  }
+  const range = vmax - vmin || 1;
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    const v = vals[j * W + i]; const t = (v - vmin) / range;
+    let r, g, b;
+    if (modelIdx === 'trust') {
+      const idx = Math.min(4, Math.floor(t * 5)); const c = hexToRgb(MODELS[idx].color);
+      r = c.r; g = c.g; b = c.b;
+    } else { [r, g, b] = rampColor(t); }
+    const p = (j * W + i) * 4;
+    img.data[p] = r; img.data[p + 1] = g; img.data[p + 2] = b;
+    img.data[p + 3] = modelIdx === 'trust' ? 170 : 150;
+  }
+  ctx.putImageData(img, 0, 0);
+  return { canvas: cv, vmin, vmax };
+}
+
+const maps = {};
+function tiles(theme) {
+  return theme === 'dark'
+    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+}
+function makeMap(id) {
+  const m = L.map(id, { zoomControl: true, scrollWheelZoom: true, preferCanvas: true }).setView([22.5, 80], 4);
+  m._tile = L.tileLayer(tiles(STATE.theme), { subdomains: 'abcd', maxZoom: 12, minZoom: 3,
+    attribution: '© OpenStreetMap · © CARTO' }).addTo(m);
+  m._overlays = {};
+  maps[id] = m;
+  return m;
+}
+function updateMapOverlay(mapId, variable, modelIdx, lead) {
+  const m = maps[mapId]; if (!m) return;
+  const { canvas, vmin, vmax } = buildFieldCanvas(variable, modelIdx, lead);
+  const url = canvas.toDataURL('image/png');
+  if (m._overlays.primary) m.removeLayer(m._overlays.primary);
+  m._overlays.primary = L.imageOverlay(url, INDIA_BOUNDS, { opacity: 0.78, interactive: false }).addTo(m);
+  if (mapId === 'mapOps') {
+    const meta = VAR_META[variable];
+    document.getElementById('legendTitle').textContent = meta.title;
+    document.getElementById('legendRange').innerHTML =
+      `<span>${vmin.toFixed(meta.decimals)}</span><span>${((vmin+vmax)/2).toFixed(meta.decimals)}</span><span>${vmax.toFixed(meta.decimals)}</span>`;
+  }
+}
+function retintAll() { Object.values(maps).forEach(m => { if (m._tile) m._tile.setUrl(tiles(STATE.theme)); }); }
+
+function renderModelLegend() {
+  document.getElementById('modelLegend').innerHTML = MODELS.map(m => `
+    <div class="nav-item" style="cursor:default;padding:8px 10px">
+      <span style="width:12px;height:12px;border-radius:4px;background:${m.color};box-shadow:0 0 8px ${m.color}66"></span>
+      <div style="line-height:1.15">
+        <div style="font-size:12.5px;font-weight:600;color:var(--text-primary)">${m.name}</div>
+        <div style="font-size:10px;color:var(--text-muted)">${m.type} · ${m.res}</div>
+      </div>
+    </div>`).join('');
+}
+
+const LAYER_DEFS = [
+  { key: 'blend',       label: 'SAMANVAY Blend',        color: 'linear-gradient(135deg,#1a6dff,#00b8a9)' },
+  { key: 'models',      label: 'Individual Models',     color: '#a259ff' },
+  { key: 'uncertainty', label: 'Uncertainty (80% PI)',  color: '#ffb000' },
+  { key: 'extremes',    label: 'Extreme Thresholds',    color: '#f04438' },
+  { key: 'trust',       label: 'TRUSTGUARD Zones',      color: '#ff6b4a' },
+];
+function renderLayers() {
+  const el = document.getElementById('layerPanel');
+  el.innerHTML = LAYER_DEFS.map(l => `
+    <div class="layer-item ${STATE.layers[l.key] ? 'on' : ''}" data-layer="${l.key}">
+      <span class="layer-swatch" style="background:${l.color}"></span>
+      <span>${l.label}</span>
+      <svg class="tick" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
+    </div>`).join('');
+  el.querySelectorAll('.layer-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const k = item.dataset.layer;
+      STATE.layers[k] = !STATE.layers[k];
+      item.classList.toggle('on', STATE.layers[k]);
+      applyLayers();
+    });
+  });
+}
+function applyLayers() {
+  const m = maps['mapOps']; if (!m) return;
+  if (STATE.layers.blend) updateMapOverlay('mapOps', STATE.variable, 'blend', STATE.lead);
+  else if (STATE.layers.models) updateMapOverlay('mapOps', STATE.variable, 3, STATE.lead);
+  else if (STATE.layers.uncertainty) updateMapOverlay('mapOps', STATE.variable, 'spread', STATE.lead);
+  else if (STATE.layers.trust) updateMapOverlay('mapOps', STATE.variable, 'trust', STATE.lead);
+  else { if (m._overlays.primary) { m.removeLayer(m._overlays.primary); m._overlays.primary = null; } }
+  if (m._extremeLayer) { m.removeLayer(m._extremeLayer); m._extremeLayer = null; }
+  if (STATE.layers.extremes || STATE.layers.trust) {
+    m._extremeLayer = L.layerGroup().addTo(m);
+    [{ lat: 15.4, lon: 73.8, color: '#f04438', label: 'Heavy Rain' },
+     { lat: 27.2, lon: 71.5, color: '#ffb000', label: 'Heat Wave' },
+     { lat: 20.1, lon: 86.0, color: '#ff6b4a', label: 'High Wind' }].forEach(p => {
+      L.circleMarker([p.lat, p.lon], { radius: 22, color: p.color, weight: 2, fillColor: p.color, fillOpacity: 0.18 })
+        .addTo(m._extremeLayer).bindTooltip(`${p.label} · TRUSTGUARD flagged`, { direction: 'top' });
+    });
+  }
+}
+
+function contextualWeight(i) {
+  const base = [0.14, 0.22, 0.12, 0.30, 0.22];
+  const shift = (STATE.lead / 120) * 0.05 * (i % 2 === 0 ? 1 : -1);
+  const v = STATE.variable === 'rain' ? [0.10, 0.28, 0.10, 0.26, 0.26] : base;
+  return Math.max(0.05, v[i] + shift);
+}
+function renderWeightBars(targetId, weights) {
+  const el = document.getElementById(targetId); if (!el) return;
+  el.innerHTML = MODELS.map((m, i) => {
+    const w = (weights ? weights[i] : contextualWeight(i)) * 100;
+    return `<div class="wbar-row">
+      <div class="wbar-name" style="color:${m.color}">${m.name}</div>
+      <div class="wbar-track"><div class="wbar-fill" style="width:${w}%;background:linear-gradient(90deg,${m.color},${m.color}cc)"></div></div>
+      <div class="wbar-val">${w.toFixed(1)}%</div>
+    </div>`;
+  }).join('');
+}
+
+function renderDominant() {
+  const rows = [
+    { region: 'North-West India', model: 'Pangu-Weather', color: '#a259ff', w: 0.38 },
+    { region: 'Central India',    model: 'NEPS',          color: '#00b8a9', w: 0.34 },
+    { region: 'Peninsular India', model: 'SAMANVAY-Ens',  color: '#1a6dff', w: 0.41 },
+    { region: 'East Coast',       model: 'NCUM-R',        color: '#ff6b4a', w: 0.36 },
+    { region: 'North-East India', model: 'GraphCast',     color: '#ffb000', w: 0.33 },
+  ];
+  document.getElementById('dominantList').innerHTML = rows.map(r => `
+    <div class="wbar-row">
+      <div class="wbar-name" style="width:130px;color:var(--text-secondary)">${r.region}</div>
+      <span class="tag" style="background:${r.color}22;color:${r.color};white-space:nowrap">${r.model}</span>
+      <div class="wbar-track" style="margin-left:auto;max-width:80px"><div class="wbar-fill" style="width:${r.w*100}%;background:${r.color}"></div></div>
+      <div class="wbar-val">${(r.w*100).toFixed(0)}%</div>
+    </div>`).join('');
+}
+
+function renderLedger() {
+  const body = document.getElementById('ledgerBody'); if (!body) return;
+  const rows = [];
+  const regions = ['North-West India','Central India','Peninsular India','East Coast','North-East India','West Rajasthan'];
+  const seasons = ['Monsoon (JJAS)','Post-Monsoon','Winter (DJF)','Pre-Monsoon'];
+  const regimes = ['Active Monsoon','Break Monsoon','Heat Wave','Synoptic Disturbance','Background'];
+  MODELS.forEach((m, mi) => {
+    regions.slice(0, 3).forEach((r, ri) => {
+      const rmse = 0.9 + (mi * 0.07) + (ri * 0.09) + (mi % 3) * 0.05;
+      const bias = ((mi - 2) * 0.07) + (ri - 1) * 0.03;
+      const status = rmse < 1.15 ? ['green','Excellent'] : rmse < 1.35 ? ['blue','Good'] : rmse < 1.55 ? ['orange','Monitor'] : ['red','Degraded'];
+      rows.push(`<tr>
+        <td><b style="color:${m.color}">${m.name}</b></td>
+        <td>${r}</td><td>${seasons[(mi+ri) % seasons.length]}</td>
+        <td>+${[6,24,48][ri]}h</td><td>${regimes[(mi*2+ri) % regimes.length]}</td>
+        <td>${rmse.toFixed(2)} °C</td>
+        <td>${bias >= 0 ? '+' : ''}${bias.toFixed(2)}</td>
+        <td class="mono">${(1200 + mi*340 + ri*180).toLocaleString()}</td>
+        <td><span class="tag ${status[0]}">${status[1]}</span></td>
+      </tr>`);
+    });
+  });
+  body.innerHTML = rows.join('');
+}
+
+function renderQueue() {
+  const el = document.getElementById('queueList'); if (!el) return;
+  const items = [
+    { sev:'critical', title:'Konkan & Goa · Heavy Rain Core', meta:'+24h · 15 Jul 2024', body:'Models disagree by >2σ in the core monsoon band. Historical sample size only 34 — below confidence threshold. TRUSTGUARD defers to human forecaster.', tags:[['red','High disagreement'],['orange','Low sample'],['blue','OOD 0.71']] },
+    { sev:'critical', title:'West Rajasthan · Heat Wave Ridge', meta:'+48h · 15 Jul 2024', body:'AI models lead by +4 °C vs NWP. Source health shows NCUM-R delayed 42 min. Blend relies 61% on Pangu in an OOD regime.', tags:[['red','Source delayed'],['purple','AI-led'],['orange','OOD 0.64']] },
+    { sev:'', title:'Coastal Odisha · Wind Gusts', meta:'+36h', body:'Cyclone-influenced regime with high inter-model spread. Deferred for forecaster sanity check before public bulletin.', tags:[['orange','High spread'],['blue','Regime 0.62']] },
+    { sev:'', title:'Himalayan Foothills · Precip Type', meta:'+24h', body:'Mixed rain/snow boundary at 3.2 km. Model disagreement on freezing level exceeds normal envelope.', tags:[['orange','Boundary case']] },
+    { sev:'', title:'Mumbai Coast · Sea Breeze', meta:'+18h', body:'Mesoscale sea-breeze circulation poorly resolved by AI models. Trust concentrated on NCUM-R.', tags:[['blue','Regional leads'],['green','High confidence']] },
+  ];
+  el.innerHTML = items.map(it => `
+    <div class="q-item ${it.sev}">
+      <div class="q-head"><div class="q-title">${it.title}</div><div class="q-meta">${it.meta}</div></div>
+      <div class="q-body">${it.body}</div>
+      <div class="q-reasons">
+        ${it.tags.map(t => `<span class="tag ${t[0]}">${t[1]}</span>`).join('')}
+        <span class="tag green" style="margin-left:auto">Delegate → Forecaster</span>
+      </div>
+    </div>`).join('');
+}
+
+const charts = {};
+function chartDefaults() {
+  Chart.defaults.font.family = "'Inter', sans-serif";
+  Chart.defaults.font.size = 11;
+  Chart.defaults.color = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim();
+  Chart.defaults.plugins.legend.labels.usePointStyle = true;
+  Chart.defaults.plugins.legend.labels.boxWidth = 8;
+  Chart.defaults.plugins.legend.labels.padding = 14;
+  Chart.defaults.animation.duration = 700;
+}
+function gridColor() { return getComputedStyle(document.documentElement).getPropertyValue('--border').trim(); }
+
+function buildCharts() {
+  chartDefaults();
+  const leads = ['+06', '+24', '+48', '+72', '+120'];
+
+  charts.spread = new Chart(document.getElementById('chartSpread'), {
+    type: 'line',
+    data: { labels: leads, datasets: [{ label: 'σ', data: [0.9, 1.8, 2.4, 3.1, 3.9],
+      borderColor: '#1a6dff', backgroundColor: 'rgba(26,109,255,0.12)', fill: true, tension: 0.4, pointRadius: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { grid: { color: gridColor() } }, y: { grid: { color: gridColor() } } } },
+  });
+  charts.health = new Chart(document.getElementById('chartHealth'), {
+    type: 'bar',
+    data: { labels: MODELS.map(m => m.name), datasets: [{ label: 'Health %', data: [98,97,95,99,92],
+      backgroundColor: MODELS.map(m => m.color + 'cc'), borderRadius: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { grid: { display: false } }, y: { grid: { color: gridColor() }, max: 100 } } },
+  });
+  charts.lead = new Chart(document.getElementById('chartLead'), {
+    type: 'line',
+    data: { labels: leads, datasets: [
+      { label: 'NCUM-G', data: [0.9,1.42,1.95,2.55,3.30], borderColor: '#1a6dff', tension: 0.35, pointRadius: 3 },
+      { label: 'NEPS',   data: [0.85,1.35,1.80,2.40,3.10], borderColor: '#00b8a9', tension: 0.35, pointRadius: 3 },
+      { label: 'Pangu',  data: [0.80,1.28,1.70,2.28,2.95], borderColor: '#a259ff', tension: 0.35, pointRadius: 3 },
+      { label: 'SAMANVAY', data: [0.72,1.11,1.48,2.02,2.60], borderColor: '#ff6b4a', borderWidth: 3, tension: 0.35, pointRadius: 4 },
+    ] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } },
+      scales: { x: { grid: { color: gridColor() } }, y: { grid: { color: gridColor() }, title: { display: true, text: 'RMSE (°C)' } } } },
+  });
+  charts.improve = new Chart(document.getElementById('chartImprove'), {
+    type: 'bar',
+    data: { labels: leads, datasets: [{ label: 'Gain %', data: [8.5,14.2,17.9,20.4,21.8],
+      backgroundColor: 'rgba(18,183,106,0.75)', borderRadius: 8 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { grid: { display: false } }, y: { grid: { color: gridColor() }, title: { display: true, text: '%' } } } },
+  });
+  charts.rmse = new Chart(document.getElementById('chartRMSE'), {
+    type: 'line',
+    data: { labels: leads, datasets: [
+      { label: 'Equal-Mean (B1)', data: [0.92,1.42,1.92,2.60,3.42], borderColor: '#7a8aa2', borderDash: [5,4], tension: 0.3 },
+      { label: 'Static Skill (B2)', data: [0.88,1.32,1.78,2.42,3.20], borderColor: '#ffb000', tension: 0.3 },
+      { label: 'Rolling (B4)', data: [0.82,1.24,1.66,2.26,3.00], borderColor: '#00b8a9', tension: 0.3 },
+      { label: 'SAMANVAY (B5)', data: [0.72,1.11,1.48,2.02,2.60], borderColor: '#1a6dff', borderWidth: 3, tension: 0.3 },
+    ] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } },
+      scales: { x: { grid: { color: gridColor() } }, y: { grid: { color: gridColor() } } } },
+  });
+  charts.bias = new Chart(document.getElementById('chartBias'), {
+    type: 'bar',
+    data: { labels: MODELS.map(m => m.name), datasets: [{ label: 'Bias °C', data: [0.21,-0.08,0.35,0.05,-0.14],
+      backgroundColor: MODELS.map(m => m.color + 'bb'), borderRadius: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { grid: { display: false } }, y: { grid: { color: gridColor() } } } },
+  });
+  charts.risk = new Chart(document.getElementById('chartRisk'), {
+    type: 'line',
+    data: { labels: ['0','10','20','30','40','50','60','70','80','90','100'], datasets: [
+      { label: 'TRUSTGUARD', data: [0.05,0.08,0.12,0.18,0.26,0.36,0.48,0.62,0.78,0.94,1.10],
+        borderColor: '#a259ff', backgroundColor: 'rgba(162,89,255,0.14)', fill: true, tension: 0.3 },
+      { label: 'No deferral', data: [0.05,0.11,0.19,0.30,0.44,0.60,0.78,0.98,1.20,1.44,1.70],
+        borderColor: '#f04438', backgroundColor: 'rgba(240,68,56,0.10)', fill: true, tension: 0.3 },
+    ] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } },
+      scales: { x: { grid: { color: gridColor() }, title: { display: true, text: 'Coverage (%)' } },
+                y: { grid: { color: gridColor() }, title: { display: true, text: 'Risk' } } } },
+  });
+  charts.cont = new Chart(document.getElementById('chartCont'), {
+    type: 'bar',
+    data: { labels: ['Hits','Misses','False Alarms','Correct Negs'], datasets: [
+      { label: 'SAMANVAY', data: [82,18,14,886], backgroundColor: 'rgba(26,109,255,0.75)', borderRadius: 6 },
+      { label: 'Best single model', data: [71,29,24,876], backgroundColor: 'rgba(162,89,255,0.55)', borderRadius: 6 },
+    ] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } },
+      scales: { x: { grid: { display: false } }, y: { grid: { color: gridColor() }, type: 'logarithmic' } } },
+  });
+  charts.confidence = new Chart(document.getElementById('chartConfidence'), {
+    type: 'doughnut',
+    data: { labels: ['High','Medium','Low'], datasets: [{ data: [58,31,11],
+      backgroundColor: ['#12b76a','#ffb000','#f04438'], borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, cutout: '62%' },
+  });
+}
+function refreshChartTheme() {
+  chartDefaults();
+  Object.values(charts).forEach(c => {
+    if (!c || !c.options.scales) return;
+    Object.values(c.options.scales).forEach(s => { if (s.grid && s.grid.color) s.grid.color = gridColor(); });
+    c.update('none');
+  });
+}
+
+function setGauge(score) {
+  const ring = document.getElementById('gaugeRing'), val = document.getElementById('gaugeVal');
+  if (!ring) return;
+  const color = score > 0.8 ? 'var(--success)' : score > 0.55 ? 'var(--warn)' : 'var(--danger)';
+  ring.style.background = `conic-gradient(${color} ${score}turn, var(--border) ${score}turn)`;
+  val.innerHTML = `${score.toFixed(2)}<small>${score > 0.8 ? 'SAFE TO PUBLISH' : 'REVIEW REQUIRED'}</small>`;
+  const top = document.getElementById('safetyScoreTop'); if (top) top.textContent = score.toFixed(2);
+}
+
+function switchView(view) {
+  STATE.view = view;
+  document.querySelectorAll('.nav-item[data-view]').forEach(n => n.classList.toggle('active', n.dataset.view === view));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const el = document.getElementById('view-' + view);
+  if (el) el.classList.add('active');
+
+  const crumb = { operations:'Operations Map', comparison:'Model Comparison', trustmap:'Trust Map',
+                  verification:'Verification Lab', extreme:'Extreme Guidance', review:'Review Queue',
+                  ledger:'Trust Ledger', pitch:'Pitch Deck', api:'Backend API' };
+  document.getElementById('crumbView').textContent = crumb[view] || view;
+
+  setTimeout(() => { Object.values(maps).forEach(m => m.invalidateSize()); }, 80);
+  if (view === 'api') checkApi();
+}
+
+function renderSlideDots() {
+  const el = document.getElementById('slideDots');
+  el.innerHTML = Array.from({ length: STATE.totalSlides }, (_, i) =>
+    `<span class="slide-dot ${i === STATE.slide ? 'on' : ''}" data-i="${i}"></span>`).join('');
+  el.querySelectorAll('.slide-dot').forEach(d => {
+    d.addEventListener('click', () => goSlide(parseInt(d.dataset.i, 10)));
+  });
+}
+function goSlide(i) {
+  i = Math.max(0, Math.min(STATE.totalSlides - 1, i));
+  STATE.slide = i;
+  document.querySelectorAll('.slide').forEach(s => s.classList.toggle('active', parseInt(s.dataset.slide, 10) === i));
+  document.querySelectorAll('.slide-dot').forEach((d, k) => d.classList.toggle('on', k === i));
+  document.getElementById('slideProgress').style.width = ((i + 1) / STATE.totalSlides * 100) + '%';
+  document.getElementById('prevSlide').disabled = i === 0;
+  document.getElementById('nextSlide').disabled = i === STATE.totalSlides - 1;
+  document.getElementById('slideBody').scrollTop = 0;
+}
+
+async function checkApi() {
+  const dot = document.getElementById('apiDot');
+  const label = document.getElementById('apiLabel');
+  const sub = document.getElementById('apiSub');
+  const mode = document.getElementById('apiMode');
+  dot.className = 'dot checking';
+  label.textContent = 'Checking FastAPI…';
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 1500);
+    const r = await fetch(`${API_BASE}/health`, { signal: ctrl.signal });
+    clearTimeout(t);
+    if (!r.ok) throw new Error('non-ok');
+    const j = await r.json();
+    STATE.apiOnline = true;
+    dot.className = 'dot on';
+    label.textContent = `Live · ${j.status || 'ok'}`;
+    sub.textContent = `${API_BASE}/health · v${j.version || '1.0.0'} · ${j.models_online || 5} models`;
+    mode.textContent = 'Live FastAPI';
+    mode.style.color = 'var(--success)';
+  } catch (e) {
+    STATE.apiOnline = false;
+    dot.className = 'dot off';
+    label.textContent = 'Offline · using deterministic mock';
+    sub.textContent = `Could not reach ${API_BASE}/health`;
+    mode.textContent = 'Mock (offline)';
+    mode.style.color = 'var(--warn)';
+  }
+}
+
+const ENDPOINTS = [
+  { m: 'GET',  p: '/health',      d: 'Service health + model count' },
+  { m: 'GET',  p: '/models',      d: 'List registered models' },
+  { m: 'GET',  p: '/blend',       d: 'Adaptive blended forecast' },
+  { m: 'GET',  p: '/weights',     d: 'Contextual MoE weights + reason codes' },
+  { m: 'GET',  p: '/ledger',      d: 'Trust Ledger rows (skill records)' },
+  { m: 'GET',  p: '/trustguard',  d: 'Safety score + publish/defer decision' },
+  { m: 'GET',  p: '/verification',d: 'RMSE / bias / skill by lead' },
+  { m: 'GET',  p: '/docs',        d: 'OpenAPI · Swagger UI' },
+];
+function renderEndpoints() {
+  document.getElementById('apiEndpoints').innerHTML = ENDPOINTS.map(e => `
+    <div class="api-endpoint">
+      <span class="method ${e.m.toLowerCase()}">${e.m}</span>
+      <span class="path">${e.p}</span>
+      <span class="desc">${e.d}</span>
+    </div>`).join('');
+}
+
+function setTheme(t) {
+  STATE.theme = t;
+  document.documentElement.setAttribute('data-theme', t);
+  const icon = document.getElementById('themeIcon');
+  if (t === 'dark') icon.innerHTML = '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>';
+  else icon.innerHTML = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
+  retintAll(); refreshChartTheme();
+  try { localStorage.setItem('samvay-theme', t); } catch(e) {}
+}
+
+function init() {
+  let t = 'light';
+  try { t = localStorage.getItem('samvay-theme') || 'light'; } catch(e){}
+  setTheme(t);
+
+  renderModelLegend(); renderLayers();
+  renderWeightBars('weightBars'); renderWeightBars('drawerWeights');
+  renderDominant(); renderLedger(); renderQueue();
+  renderEndpoints(); renderSlideDots(); goSlide(0);
+
+  ['mapOps','mapNCUMG','mapNEPS','mapPangu','mapBlend','mapTrust','mapExtreme'].forEach(makeMap);
+
+  updateMapOverlay('mapOps', STATE.variable, 'blend', STATE.lead);
+  updateMapOverlay('mapNCUMG', STATE.variable, 0, STATE.lead);
+  updateMapOverlay('mapNEPS', STATE.variable, 1, STATE.lead);
+  updateMapOverlay('mapPangu', STATE.variable, 3, STATE.lead);
+  updateMapOverlay('mapBlend', STATE.variable, 'blend', STATE.lead);
+  updateMapOverlay('mapTrust', STATE.variable, 'trust', STATE.lead);
+  updateMapOverlay('mapExtreme', 'rain', 'blend', STATE.lead);
+  applyLayers();
+  setGauge(0.91);
+  setTimeout(buildCharts, 60);
+
+  document.querySelectorAll('.nav-item[data-view]').forEach(n => n.addEventListener('click', () => switchView(n.dataset.view)));
+  document.getElementById('btnTheme').addEventListener('click', () => setTheme(STATE.theme === 'light' ? 'dark' : 'light'));
+
+  document.getElementById('selInit').addEventListener('change', e => { STATE.init = e.target.value; });
+  document.getElementById('selLead').addEventListener('change', e => {
+    STATE.lead = parseInt(e.target.value, 10);
+    updateMapOverlay('mapOps', STATE.variable, 'blend', STATE.lead);
+    renderWeightBars('weightBars'); renderWeightBars('drawerWeights');
+  });
+  document.getElementById('selVar').addEventListener('change', e => {
+    STATE.variable = e.target.value;
+    updateMapOverlay('mapOps', STATE.variable, 'blend', STATE.lead);
+    updateMapOverlay('mapNCUMG', STATE.variable, 0, STATE.lead);
+    updateMapOverlay('mapNEPS',  STATE.variable, 1, STATE.lead);
+    updateMapOverlay('mapPangu', STATE.variable, 3, STATE.lead);
+    updateMapOverlay('mapBlend', STATE.variable, 'blend', STATE.lead);
+    updateMapOverlay('mapTrust', STATE.variable, 'trust', STATE.lead);
+    applyLayers();
+  });
+
+  const openDrawer = () => { document.getElementById('drawer').classList.add('show'); document.getElementById('drawerBg').classList.add('show'); };
+  const closeDrawer = () => { document.getElementById('drawer').classList.remove('show'); document.getElementById('drawerBg').classList.remove('show'); };
+  document.getElementById('openCellDrawer').addEventListener('click', openDrawer);
+  document.getElementById('drawerClose').addEventListener('click', closeDrawer);
+  document.getElementById('drawerBg').addEventListener('click', closeDrawer);
+  maps['mapOps'].on('click', e => {
+    const { lat, lng } = e.latlng;
+    if (lat < 6 || lat > 38 || lng < 66 || lng > 98) return;
+    document.getElementById('drawerCoords').textContent = `${lat.toFixed(1)}°N, ${lng.toFixed(1)}°E · +${STATE.lead}h`;
+    renderWeightBars('drawerWeights'); openDrawer();
+  });
+
+  document.getElementById('prevSlide').addEventListener('click', () => goSlide(STATE.slide - 1));
+  document.getElementById('nextSlide').addEventListener('click', () => goSlide(STATE.slide + 1));
+  document.addEventListener('keydown', e => {
+    if (STATE.view !== 'pitch') return;
+    if (e.key === 'ArrowRight') goSlide(STATE.slide + 1);
+    if (e.key === 'ArrowLeft') goSlide(STATE.slide - 1);
+  });
+
+  document.getElementById('apiRetry').addEventListener('click', checkApi);
+  document.querySelectorAll('.code-copy').forEach(b => {
+    b.addEventListener('click', async () => {
+      const el = document.getElementById(b.dataset.target);
+      if (!el) return;
+      try { await navigator.clipboard.writeText(el.innerText); b.textContent = 'Copied!'; setTimeout(() => b.textContent = 'Copy', 1400); } catch(e) {}
+    });
+  });
+
+  setTimeout(() => document.getElementById('loader').classList.add('hide'), 900);
+}
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

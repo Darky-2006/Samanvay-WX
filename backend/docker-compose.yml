@@ -1,0 +1,31 @@
+version: "3.9"
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    depends_on: [postgres, redis]
+    environment:
+      DATABASE_URL: postgresql://samvay:samvay@postgres:5432/samvay
+      REDIS_URL: redis://redis:6379/0
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: samvay
+      POSTGRES_PASSWORD: samvay
+      POSTGRES_DB: samvay
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    ports: ["9000:9000", "9001:9001"]
+    environment:
+      MINIO_ROOT_USER: samvay
+      MINIO_ROOT_PASSWORD: samvaysecret
+    volumes: [miniodata:/data]
+volumes:
+  pgdata:
+  miniodata:
